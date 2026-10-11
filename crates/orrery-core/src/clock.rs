@@ -47,6 +47,6 @@ impl Clock {
 
     /// True on the first tick of a new year (after year 0 starts at tick 0).
     pub fn is_year_boundary(&self) -> bool {
-        self.tick > 0 && self.tick % self.ticks_per_year() == 0
+        self.tick > 0 && self.tick.is_multiple_of(self.ticks_per_year())
     }
 }

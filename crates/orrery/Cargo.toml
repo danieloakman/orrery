@@ -3,7 +3,11 @@ name = "orrery"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Full-tilt runner client for the Orrery simulation server"
+
+[lints]
+workspace = true
 
 [[bin]]
 name = "orrery"

@@ -3,7 +3,11 @@ name = "orrery-server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 description = "Local Unix-socket simulation server for Orrery"
+
+[lints]
+workspace = true
 
 [[bin]]
 name = "orrery-server"

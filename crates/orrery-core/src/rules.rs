@@ -250,8 +250,10 @@ fn adjacent_settlements(a: &crate::world::Civ, b: &crate::world::Civ) -> bool {
     false
 }
 
+type CollapseRecord = (String, String, Vec<(u32, u32)>);
+
 fn collapse(world: &mut World) {
-    let mut fell: Vec<(String, String, Vec<(u32, u32)>)> = Vec::new();
+    let mut fell: Vec<CollapseRecord> = Vec::new();
     for civ in world.civs.iter_mut().filter(|c| c.alive) {
         let sites = civ
             .settlements

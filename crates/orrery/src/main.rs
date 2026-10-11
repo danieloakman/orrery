@@ -62,7 +62,7 @@ fn run(args: RunArgs) -> Result<(), Box<dyn std::error::Error>> {
         days_per_year: args.days_per_year,
         civ_count: args.civs,
     };
-    config.validate().map_err(|e| e)?;
+    config.validate()?;
 
     let ticks_per_year = config.ticks_per_year();
     let batch_n = args.batch_ticks.unwrap_or(ticks_per_year).max(1);
