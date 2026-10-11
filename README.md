@@ -2,9 +2,9 @@
 
 Deterministic fantasy **history simulator** in Rust.
 
-Generate a seedable world, tick civilizations for centuries, and export a readable chronicle. A local server owns simulation time; clients advance it with `advance_tick(n)` — the same seam later humans and LLM agents will use to observe and steer.
+Generate a seedable world, tick civilizations for centuries, and export a readable chronicle. A local server owns simulation time; clients advance it with `advance_tick(n)`, the same seam later humans and LLM agents will use to observe and steer.
 
-> North-star: many agents in one shared world, each locked to a separate civ (or a god role), interacting only through sim rules — not co-op on one fort.
+> North-star: many agents in one shared world, each locked to a separate civ (or a god role), interacting only through sim rules, not co-op on one fort.
 
 ## Quick start
 
@@ -12,10 +12,8 @@ Generate a seedable world, tick civilizations for centuries, and export a readab
 cargo build --workspace
 
 # Full-tilt run: spawns the server, simulates, dumps artifacts
-cargo run -p orrery -- run --seed 1 --years 100 --ticks-per-day 1 --out out/seed1
+cargo run -p orrery -- run --seed 1 --years 100 --out out/seed1
 ```
-
-`--ticks-per-day 1` is faster for batch chronicles. Default is `24` (hourly ticks).
 
 **Outputs** in `--out`:
 
@@ -31,8 +29,8 @@ Same seed + config + advance sequence ⇒ same hash (`cargo test -p orrery-core`
 ### Example seeds
 
 ```bash
-cargo run -p orrery -- run --seed 1 --years 200 --ticks-per-day 1 --out out/seed1
-cargo run -p orrery -- run --seed 42 --years 200 --ticks-per-day 1 --out out/seed42
+cargo run -p orrery -- run --seed 1 --years 200 --out out/seed1
+cargo run -p orrery -- run --seed 42 --years 200 --out out/seed42
 ```
 
 ### Manual server
@@ -40,7 +38,7 @@ cargo run -p orrery -- run --seed 42 --years 200 --ticks-per-day 1 --out out/see
 ```bash
 cargo run -p orrery-server -- --socket /tmp/orrery.sock
 
-cargo run -p orrery -- run --seed 7 --years 50 --ticks-per-day 1 \
+cargo run -p orrery -- run --seed 7 --years 50 \
   --socket /tmp/orrery.sock --out out/manual
 ```
 
@@ -51,8 +49,18 @@ orrery (runner)  --NDJSON/Unix socket-->  orrery-server  -->  orrery-core
      create / status / advance_tick(n) / dump / shutdown
 ```
 
-- **Clock:** integer ticks; default hour grain; day/year derived. The server never auto-ticks — time stands still until a client advances it.
-- **`advance_tick(n)`:** one RPC runs `n` steps in-process. Blind batches are intentional: you pre-commit to a time window before the next observe/intervene chance.
+### Time
+
+**1 tick = 1 hour, always.** Not configurable.
+
+| Advance | Sim time |
+|---------|----------|
+| `advance_tick(1)` | 1 hour |
+| `advance_tick(24)` | 1 day |
+| `advance_tick(8760)` | 1 year (365×24) |
+
+The server never auto-ticks; time stands still until a client advances it. Blind batches are intentional: you pre-commit to a time window before the next observe/intervene chance.
+
 - **Systems:** scheduled (e.g. yearly civ growth/war), integrating elapsed time. Queries never mutate state.
 - **Stop policy:** the server never decides to end (civs dying is just state). The client chooses when to dump or shut down.
 
@@ -62,7 +70,7 @@ orrery (runner)  --NDJSON/Unix socket-->  orrery-server  -->  orrery-core
 |--------|---------|
 | `create` | Seed + config → generate world |
 | `status` | Read-only clock / civ counts |
-| `advance_tick` | `{ "n": u64 }` → step `n` times |
+| `advance_tick` | `{ "n": u64 }` → step `n` hours |
 | `dump` | Chronicle, map, state JSON |
 | `shutdown` | Graceful exit |
 
