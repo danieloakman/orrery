@@ -8,3 +8,6 @@
 /tmp/
 *.sock
 .DS_Store
+.direnv/
+result
+result-*
