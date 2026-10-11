@@ -25,7 +25,11 @@ build:
 build-release:
     cargo build --workspace --release
 
-# Full-tilt simulation run.
+# Start the simulation server only (no auto-advance). Ctrl-C to stop.
+serve socket="/tmp/orrery.sock":
+    cargo run -p orrery-server -- --socket {{socket}}
+
+# Full-tilt simulation run (spawns server, advances years, dumps, shuts down).
 run seed="1" years="100" out="out/seed1":
     cargo run -p orrery -- run --seed {{seed}} --years {{years}} --out {{out}}
 

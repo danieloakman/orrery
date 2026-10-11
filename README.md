@@ -14,11 +14,14 @@ Generate a seedable world, tick civilizations for centuries, and export a readab
 ```bash
 just build
 
+# Server only (clients attach separately)
+just serve
+
 # Full-tilt run: spawns the server, simulates, dumps artifacts
 just run seed=1 years=100 out=out/seed1
 ```
 
-**Outputs** in `--out`:
+**Outputs** in `--out` (from `just run`):
 
 | File | Contents |
 |------|----------|
@@ -36,11 +39,12 @@ just run seed=1 years=200 out=out/seed1
 just run seed=42 years=200 out=out/seed42
 ```
 
-### Manual server
+### Attach a client to a running server
 
 ```bash
-cargo run -p orrery-server -- --socket /tmp/orrery.sock
+just serve   # terminal 1 — listens on /tmp/orrery.sock
 
+# terminal 2 — connect instead of spawning a server
 cargo run -p orrery -- run --seed 7 --years 50 \
   --socket /tmp/orrery.sock --out out/manual
 ```
@@ -67,6 +71,7 @@ Common tasks:
 | `just check` | `fmt --check` + `clippy -D warnings` |
 | `just test` | workspace unit + integration tests |
 | `just ci` | `check` then `test` (same as Actions) |
+| `just serve` | start server only (no auto-advance) |
 | `just run` | full-tilt simulation dump |
 
 License: [MIT](LICENSE).
