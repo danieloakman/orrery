@@ -1,57 +1,90 @@
 # Orrery
 
-Deterministic, seedable fantasy **history simulator** in Rust. A local server owns the world clock; clients advance time with `advance_tick(n)` and dump a chronicle.
+Deterministic fantasy **history simulator** in Rust.
 
-North-star: many agents, each locked to a civ (or god role), sharing one concurrent world through the same server API.
+Generate a seedable world, tick civilizations for centuries, and export a readable chronicle. A local server owns simulation time; clients advance it with `advance_tick(n)` — the same seam later humans and LLM agents will use to observe and steer.
+
+> North-star: many agents in one shared world, each locked to a separate civ (or a god role), interacting only through sim rules — not co-op on one fort.
 
 ## Quick start
 
 ```bash
 cargo build --workspace
-# ticks-per-day=1 is faster for chronicle batches; default is 24 (hourly)
+
+# Full-tilt run: spawns the server, simulates, dumps artifacts
 cargo run -p orrery -- run --seed 1 --years 100 --ticks-per-day 1 --out out/seed1
 ```
 
-This spawns `orrery-server`, creates a world, advances at full tilt in yearly batches, writes:
+`--ticks-per-day 1` is faster for batch chronicles. Default is `24` (hourly ticks).
 
-- `chronicle.md` — dated legends
-- `map.txt` — ASCII square-grid map
-- `state.json` — full serde snapshot
-- `manifest.json` — seed/config/hash
+**Outputs** in `--out`:
 
-Same seed + config ⇒ same chronicle (see `cargo test -p orrery-core`).
+| File | Contents |
+|------|----------|
+| `chronicle.md` | Dated legends |
+| `map.txt` | ASCII square-grid map |
+| `state.json` | Full world snapshot |
+| `manifest.json` | Seed, config, state hash |
+
+Same seed + config + advance sequence ⇒ same hash (`cargo test -p orrery-core`).
 
 ### Example seeds
 
 ```bash
-cargo run -p orrery -- run --seed 1 --years 200 --out out/seed1
-cargo run -p orrery -- run --seed 42 --years 200 --out out/seed42
+cargo run -p orrery -- run --seed 1 --years 200 --ticks-per-day 1 --out out/seed1
+cargo run -p orrery -- run --seed 42 --years 200 --ticks-per-day 1 --out out/seed42
 ```
 
 ### Manual server
 
 ```bash
 cargo run -p orrery-server -- --socket /tmp/orrery.sock
-# elsewhere:
-cargo run -p orrery -- run --seed 7 --years 50 --socket /tmp/orrery.sock --out out/manual
+
+cargo run -p orrery -- run --seed 7 --years 50 --ticks-per-day 1 \
+  --socket /tmp/orrery.sock --out out/manual
 ```
 
-## Clock & API
+## How it works
 
-- Tick defaults to **hourly** (`ticks_per_day=24`); year/day derived.
-- Systems run on a **schedule** (yearly civ rules) and integrate elapsed time; queries never mutate.
-- Server RPCs (newline JSON on a Unix socket): `create`, `status`, `advance_tick`, `dump`, `shutdown`.
-- Blind batches are intentional: you pre-commit to `n` ticks before the next observe/intervene window.
-- The server **never** decides to stop (including if all civs die). The runner chooses when to dump/shutdown.
+```text
+orrery (runner)  --NDJSON/Unix socket-->  orrery-server  -->  orrery-core
+     create / status / advance_tick(n) / dump / shutdown
+```
+
+- **Clock:** integer ticks; default hour grain; day/year derived. The server never auto-ticks — time stands still until a client advances it.
+- **`advance_tick(n)`:** one RPC runs `n` steps in-process. Blind batches are intentional: you pre-commit to a time window before the next observe/intervene chance.
+- **Systems:** scheduled (e.g. yearly civ growth/war), integrating elapsed time. Queries never mutate state.
+- **Stop policy:** the server never decides to end (civs dying is just state). The client chooses when to dump or shut down.
+
+### RPC (newline-delimited JSON)
+
+| Method | Purpose |
+|--------|---------|
+| `create` | Seed + config → generate world |
+| `status` | Read-only clock / civ counts |
+| `advance_tick` | `{ "n": u64 }` → step `n` times |
+| `dump` | Chronicle, map, state JSON |
+| `shutdown` | Graceful exit |
 
 ## Workspace
 
 | Crate | Role |
 |-------|------|
-| `orrery-core` | Map gen, clock, rules, chronicle, IPC types |
-| `orrery-server` | Owns one world; Unix socket RPC |
-| `orrery` | Full-tilt runner client |
+| [`orrery-core`](crates/orrery-core) | Map gen, clock, rules, chronicle, protocol |
+| [`orrery-server`](crates/orrery-server) | Owns one world; Unix socket RPC |
+| [`orrery`](crates/orrery) | Full-tilt runner client |
 
-## Non-goals (for now)
+## Sample chronicle
 
-God/civ `simctl`, agent skills, egui, hex maps, network auth.
+```markdown
+**Year 0** (day 0): The age began with 6 peoples.
+**Year 0** (day 0): The Corfolk founded a settlement at (91,58).
+**Year 6** (day 2190): Among the Dunhold: a twin moon rose and the rivers ran silver for a night
+**Year 10** (day 3650): The Belormoor expanded to (42,34).
+```
+
+## Status / non-goals
+
+POC: headless fantasy world, server + runner, deterministic dumps.
+
+Not yet: `simctl` god/civ interventions, agent skills, map UI, hex grids, networked multiplayer.
