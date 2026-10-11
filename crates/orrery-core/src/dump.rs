@@ -63,7 +63,9 @@ pub fn render_map_ascii(world: &World) -> String {
     }
 
     let mut out = String::new();
-    out.push_str(&format!("# map {w}x{h}  ~ocean  ,@capital  o village  x ruin\n"));
+    out.push_str(&format!(
+        "# map {w}x{h}  ~ocean  ,@capital  o village  x ruin\n"
+    ));
     for y in 0..h {
         for x in 0..w {
             out.push(grid[(y * w + x) as usize]);

@@ -74,10 +74,9 @@ fn growth(world: &mut World, years: f32) {
         let add = ((civ.population as f32) * growth_rate).round() as i32;
         civ.population = (civ.population as i32 + add).clamp(1, 500_000) as u32;
         civ.food = (civ.food + food_mult * years * 2.0 - years).clamp(0.0, 100.0);
-        civ.strength = (civ.strength
-            + years * 0.3 * civ.tech
-            + (civ.population as f32).sqrt() * 0.01)
-            .clamp(1.0, 10_000.0);
+        civ.strength =
+            (civ.strength + years * 0.3 * civ.tech + (civ.population as f32).sqrt() * 0.01)
+                .clamp(1.0, 10_000.0);
         civ.tech = (civ.tech + years * 0.02).min(5.0);
     }
 }
@@ -91,7 +90,13 @@ fn expand(world: &mut World) {
         if civ.population < 120 {
             continue;
         }
-        if civ.settlements.iter().filter(|s| s.kind != SettlementKind::Ruin).count() >= 12 {
+        if civ
+            .settlements
+            .iter()
+            .filter(|s| s.kind != SettlementKind::Ruin)
+            .count()
+            >= 12
+        {
             continue;
         }
         // Chance scaled by strength
@@ -225,8 +230,16 @@ fn conflict(world: &mut World) {
 }
 
 fn adjacent_settlements(a: &crate::world::Civ, b: &crate::world::Civ) -> bool {
-    for sa in a.settlements.iter().filter(|s| s.kind != SettlementKind::Ruin) {
-        for sb in b.settlements.iter().filter(|s| s.kind != SettlementKind::Ruin) {
+    for sa in a
+        .settlements
+        .iter()
+        .filter(|s| s.kind != SettlementKind::Ruin)
+    {
+        for sb in b
+            .settlements
+            .iter()
+            .filter(|s| s.kind != SettlementKind::Ruin)
+        {
             let dx = (sa.x as i32 - sb.x as i32).abs();
             let dy = (sa.y as i32 - sb.y as i32).abs();
             if dx + dy == 1 {
@@ -253,11 +266,7 @@ fn collapse(world: &mut World) {
             } else {
                 "decline".into()
             };
-            let ruins: Vec<(u32, u32)> = civ
-                .settlements
-                .iter()
-                .map(|s| (s.x, s.y))
-                .collect();
+            let ruins: Vec<(u32, u32)> = civ.settlements.iter().map(|s| (s.x, s.y)).collect();
             for s in &mut civ.settlements {
                 s.kind = SettlementKind::Ruin;
             }

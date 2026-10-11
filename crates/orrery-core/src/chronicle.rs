@@ -19,5 +19,10 @@ pub fn render_chronicle_md(world: &World) -> String {
 }
 
 fn format_event(ev: &Event) -> String {
-    format!("**Year {}** (day {}): {}", ev.year, ev.day, ev.kind.summary())
+    format!(
+        "**Year {}** (day {}): {}",
+        ev.year,
+        ev.day,
+        ev.kind.summary()
+    )
 }

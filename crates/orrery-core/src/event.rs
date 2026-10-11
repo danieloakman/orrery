@@ -11,17 +11,37 @@ pub struct Event {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EventKind {
-    WorldBorn { civs: u8 },
-    Founded { civ: String, x: u32, y: u32 },
-    Expanded { civ: String, x: u32, y: u32 },
+    WorldBorn {
+        civs: u8,
+    },
+    Founded {
+        civ: String,
+        x: u32,
+        y: u32,
+    },
+    Expanded {
+        civ: String,
+        x: u32,
+        y: u32,
+    },
     War {
         attacker: String,
         defender: String,
         victor: String,
     },
-    Fell { civ: String, cause: String },
-    Ruin { civ: String, x: u32, y: u32 },
-    Myth { civ: String, tale: String },
+    Fell {
+        civ: String,
+        cause: String,
+    },
+    Ruin {
+        civ: String,
+        x: u32,
+        y: u32,
+    },
+    Myth {
+        civ: String,
+        tale: String,
+    },
 }
 
 impl EventKind {

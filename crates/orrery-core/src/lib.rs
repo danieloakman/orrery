@@ -17,9 +17,9 @@ pub use ipc::{Client as IpcClient, IpcError};
 pub use chronicle::render_chronicle_md;
 pub use clock::{Clock, TICKS_PER_DAY};
 pub use config::SimConfig;
-pub use dump::{DumpArtifacts, build_dump, render_map_ascii, state_hash};
-pub use protocol::cap_events;
+pub use dump::{build_dump, render_map_ascii, state_hash, DumpArtifacts};
 pub use event::{Event, EventKind};
+pub use protocol::cap_events;
 pub use protocol::{
     AdvanceTickParams, AdvanceTickResult, CreateParams, DumpResult, OkBody, Request, Response,
     StatusResult, EVENT_CAP,

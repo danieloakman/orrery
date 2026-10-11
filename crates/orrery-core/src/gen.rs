@@ -20,7 +20,12 @@ impl Biome {
     pub fn hospitable(self) -> bool {
         matches!(
             self,
-            Biome::Plains | Biome::Forest | Biome::Hills | Biome::Coast | Biome::River | Biome::Swamp
+            Biome::Plains
+                | Biome::Forest
+                | Biome::Hills
+                | Biome::Coast
+                | Biome::River
+                | Biome::Swamp
         )
     }
 

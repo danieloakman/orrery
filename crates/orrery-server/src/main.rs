@@ -6,12 +6,16 @@ use std::thread;
 
 use clap::Parser;
 use orrery_core::protocol::{
-    AdvanceTickResult, CreateParams, DumpResult, OkBody, Request, Response, StatusResult, cap_events,
+    cap_events, AdvanceTickResult, CreateParams, DumpResult, OkBody, Request, Response,
+    StatusResult,
 };
-use orrery_core::{SimConfig, World, build_dump};
+use orrery_core::{build_dump, SimConfig, World};
 
 #[derive(Parser, Debug)]
-#[command(name = "orrery-server", about = "Orrery simulation server (Unix socket)")]
+#[command(
+    name = "orrery-server",
+    about = "Orrery simulation server (Unix socket)"
+)]
 struct Args {
     /// Unix socket path
     #[arg(long, default_value = "/tmp/orrery.sock")]
@@ -89,7 +93,12 @@ fn handle_client(
         let req: Request = match serde_json::from_str(line.trim_end()) {
             Ok(r) => r,
             Err(e) => {
-                write_resp(&mut writer, Response::Err { error: e.to_string() })?;
+                write_resp(
+                    &mut writer,
+                    Response::Err {
+                        error: e.to_string(),
+                    },
+                )?;
                 continue;
             }
         };
