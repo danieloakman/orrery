@@ -1,10 +1,20 @@
 {
   description = "Orrery development shell";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
 
   outputs =
-    { nixpkgs, ... }:
+    {
+      nixpkgs,
+      rust-overlay,
+      ...
+    }:
     let
       systems = [
         "x86_64-linux"
@@ -18,22 +28,23 @@
       devShells = forAllSystems (
         system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ rust-overlay.overlays.default ];
+          };
+          # Single source of truth: ./rust-toolchain.toml
+          rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
         in
         {
           default = pkgs.mkShell {
             name = "orrery";
-            packages = with pkgs; [
-              cargo
-              rustc
-              rustfmt
-              clippy
-              rust-analyzer
-              pkg-config
+            packages = [
+              rustToolchain
+              pkgs.just
+              pkgs.pkg-config
             ];
 
-            # Lets rust-analyzer and friends find std sources.
-            RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
+            RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
           };
         }
       );
