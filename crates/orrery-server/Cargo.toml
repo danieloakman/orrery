@@ -1,0 +1,17 @@
+[package]
+name = "orrery-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local Unix-socket simulation server for Orrery"
+
+[[bin]]
+name = "orrery-server"
+path = "src/main.rs"
+
+[dependencies]
+orrery-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+thiserror = { workspace = true }

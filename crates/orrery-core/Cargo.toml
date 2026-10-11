@@ -1,0 +1,15 @@
+[package]
+name = "orrery-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Deterministic fantasy world simulation core for Orrery"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
