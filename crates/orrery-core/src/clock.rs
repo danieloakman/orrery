@@ -2,12 +2,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::SimConfig;
 
-/// One tick is always one hour. 24 ticks = one day.
-pub const TICKS_PER_DAY: u32 = 24;
+/// One tick is always one minute. Not configurable.
+pub const TICKS_PER_HOUR: u32 = 60;
+/// 24 hours × 60 minutes.
+pub const TICKS_PER_DAY: u32 = 24 * TICKS_PER_HOUR;
+pub const HOURS_PER_DAY: u32 = 24;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Clock {
-    /// Sole advanced counter. Unit: hours.
+    /// Sole advanced counter. Unit: minutes.
     pub tick: u64,
     pub days_per_year: u32,
 }
@@ -30,7 +33,12 @@ impl Clock {
 
     /// Hour of day, 0..=23.
     pub fn hour(&self) -> u32 {
-        (self.tick % u64::from(TICKS_PER_DAY)) as u32
+        ((self.tick / u64::from(TICKS_PER_HOUR)) % u64::from(HOURS_PER_DAY)) as u32
+    }
+
+    /// Minute of hour, 0..=59.
+    pub fn minute(&self) -> u32 {
+        (self.tick % u64::from(TICKS_PER_HOUR)) as u32
     }
 
     pub fn year(&self) -> u64 {

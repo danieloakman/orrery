@@ -144,9 +144,19 @@ impl World {
 
     pub fn advance_ticks(&mut self, n: u64) -> Vec<Event> {
         let start = self.events.len();
-        for _ in 0..n {
-            rules::run_due(self);
-            self.clock.advance();
+        let mut remaining = n;
+        while remaining > 0 {
+            let until_due = rules::ticks_until_due(self);
+            if until_due == 0 {
+                rules::run_due(self);
+                self.clock.advance();
+                remaining -= 1;
+            } else {
+                // Idle ticks only advance the clock; jump ahead in one step.
+                let skip = until_due.min(remaining);
+                self.clock.tick = self.clock.tick.saturating_add(skip);
+                remaining -= skip;
+            }
         }
         self.events[start..].to_vec()
     }

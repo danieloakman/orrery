@@ -23,22 +23,38 @@ impl Default for SystemSchedule {
     }
 }
 
-/// Run systems due at the world's current tick (before clock advances).
-pub fn run_due(world: &mut World) {
+fn yearly_due(world: &World) -> bool {
     let ticks_per_year = world.config.ticks_per_year();
-    let due_yearly = match world.schedule.last_yearly_tick {
+    match world.schedule.last_yearly_tick {
         None => world.clock.tick == 0 || world.clock.tick >= ticks_per_year,
         Some(last) => world.clock.tick.saturating_sub(last) >= ticks_per_year,
-    };
-
-    if due_yearly {
-        let dt = match world.schedule.last_yearly_tick {
-            None => world.clock.tick.max(1),
-            Some(last) => world.clock.tick.saturating_sub(last).max(1),
-        };
-        yearly_systems(world, dt);
-        world.schedule.last_yearly_tick = Some(world.clock.tick);
     }
+}
+
+/// Ticks until a scheduled system is due at the current clock (0 if due now).
+/// Used to skip idle minutes without changing determinism.
+pub(crate) fn ticks_until_due(world: &World) -> u64 {
+    if yearly_due(world) {
+        return 0;
+    }
+    let ticks_per_year = world.config.ticks_per_year();
+    match world.schedule.last_yearly_tick {
+        None => ticks_per_year.saturating_sub(world.clock.tick),
+        Some(last) => ticks_per_year.saturating_sub(world.clock.tick.saturating_sub(last)),
+    }
+}
+
+/// Run systems due at the world's current tick (before clock advances).
+pub fn run_due(world: &mut World) {
+    if !yearly_due(world) {
+        return;
+    }
+    let dt = match world.schedule.last_yearly_tick {
+        None => world.clock.tick.max(1),
+        Some(last) => world.clock.tick.saturating_sub(last).max(1),
+    };
+    yearly_systems(world, dt);
+    world.schedule.last_yearly_tick = Some(world.clock.tick);
 }
 
 fn yearly_systems(world: &mut World, dt_ticks: u64) {

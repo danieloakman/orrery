@@ -25,7 +25,7 @@ impl Default for SimConfig {
 }
 
 impl SimConfig {
-    /// Hours in one sim year (always 24 hours/day).
+    /// Minutes in one sim year (always 1440 minutes/day).
     pub fn ticks_per_year(&self) -> u64 {
         u64::from(self.days_per_year.max(1)) * u64::from(TICKS_PER_DAY)
     }

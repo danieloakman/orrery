@@ -15,7 +15,7 @@ mod world;
 pub use ipc::{Client as IpcClient, IpcError};
 
 pub use chronicle::render_chronicle_md;
-pub use clock::{Clock, TICKS_PER_DAY};
+pub use clock::{Clock, HOURS_PER_DAY, TICKS_PER_DAY, TICKS_PER_HOUR};
 pub use config::SimConfig;
 pub use dump::{build_dump, render_map_ascii, state_hash, DumpArtifacts};
 pub use event::{Event, EventKind};
@@ -94,16 +94,20 @@ mod tests {
     }
 
     #[test]
-    fn twenty_four_ticks_is_one_day() {
+    fn ticks_per_day_is_one_day() {
         let mut w = World::create(cfg(1)).unwrap();
         assert_eq!(w.clock.day(), 0);
         assert_eq!(w.clock.hour(), 0);
-        w.advance_ticks(23);
+        assert_eq!(w.clock.minute(), 0);
+        // End of hour 23 (one hour before midnight).
+        w.advance_ticks(u64::from(TICKS_PER_DAY - TICKS_PER_HOUR));
         assert_eq!(w.clock.day(), 0);
         assert_eq!(w.clock.hour(), 23);
-        w.advance_ticks(1);
+        assert_eq!(w.clock.minute(), 0);
+        w.advance_ticks(u64::from(TICKS_PER_HOUR));
         assert_eq!(w.clock.day(), 1);
         assert_eq!(w.clock.hour(), 0);
+        assert_eq!(w.clock.minute(), 0);
     }
 
     #[test]

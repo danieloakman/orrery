@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use clap::{Parser, Subcommand};
 use orrery_core::protocol::{AdvanceTickParams, CreateParams, OkBody, Request};
-use orrery_core::{IpcClient, SimConfig, TICKS_PER_DAY};
+use orrery_core::{IpcClient, SimConfig, TICKS_PER_DAY, TICKS_PER_HOUR};
 
 #[derive(Parser, Debug)]
 #[command(name = "orrery", about = "Orrery full-tilt simulation runner")]
@@ -34,7 +34,7 @@ struct RunArgs {
     height: u32,
     #[arg(long, default_value_t = 6)]
     civs: u8,
-    /// Hours (ticks) per advance_tick RPC (default: one year)
+    /// Ticks (minutes) per advance_tick RPC (default: one year)
     #[arg(long)]
     batch_ticks: Option<u64>,
     /// Connect to an existing server socket. If omitted, spawn orrery-server.
@@ -85,7 +85,7 @@ fn run(args: RunArgs) -> Result<(), Box<dyn std::error::Error>> {
     }))? {
         OkBody::Created { civs, .. } => {
             println!(
-                "created world seed={} civs={civs} (1 tick = 1 hour, {} ticks/day)",
+                "created world seed={} civs={civs} (1 tick = 1 minute, {} ticks/day)",
                 config.seed, TICKS_PER_DAY
             );
         }
@@ -104,11 +104,12 @@ fn run(args: RunArgs) -> Result<(), Box<dyn std::error::Error>> {
         let n = remaining.min(batch_n);
         match client.call_ok(&Request::AdvanceTick(AdvanceTickParams { n }))? {
             OkBody::AdvanceTick(r) => {
+                let hour = (r.tick / u64::from(TICKS_PER_HOUR)) % 24;
                 println!(
                     "year {}  day {}  hour {}  tick {}  events+{}{}",
                     r.year,
                     r.day,
-                    r.tick % u64::from(TICKS_PER_DAY),
+                    hour,
                     r.tick,
                     r.events_len,
                     if r.truncated { " (truncated)" } else { "" }
@@ -133,7 +134,7 @@ fn run(args: RunArgs) -> Result<(), Box<dyn std::error::Error>> {
             "seed": config.seed,
             "years": args.years,
             "ticks_per_day": TICKS_PER_DAY,
-            "tick_unit": "hour",
+            "tick_unit": "minute",
             "days_per_year": config.days_per_year,
             "width": config.width,
             "height": config.height,

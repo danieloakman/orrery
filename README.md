@@ -80,13 +80,14 @@ orrery (runner)  --NDJSON/Unix socket-->  orrery-server  -->  orrery-core
 
 ### Time
 
-**1 tick = 1 hour, always.** Not configurable.
+**1 tick = 1 minute, always.** Not configurable. Most systems still run on coarser periods (e.g. yearly) and integrate elapsed time.
 
 | Advance | Sim time |
 |---------|----------|
-| `advance_tick(1)` | 1 hour |
-| `advance_tick(24)` | 1 day |
-| `advance_tick(8760)` | 1 year (365×24) |
+| `advance_tick(1)` | 1 minute |
+| `advance_tick(60)` | 1 hour |
+| `advance_tick(1440)` | 1 day |
+| `advance_tick(525600)` | 1 year (365×1440) |
 
 The server never auto-ticks; time stands still until a client advances it. Blind batches are intentional: you pre-commit to a time window before the next observe/intervene chance.
 
@@ -99,7 +100,7 @@ The server never auto-ticks; time stands still until a client advances it. Blind
 |--------|---------|
 | `create` | Seed + config → generate world |
 | `status` | Read-only clock / civ counts |
-| `advance_tick` | `{ "n": u64 }` → step `n` hours |
+| `advance_tick` | `{ "n": u64 }` → step `n` minutes |
 | `dump` | Chronicle, map, state JSON |
 | `shutdown` | Graceful exit |
 

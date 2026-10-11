@@ -85,7 +85,7 @@ fn create_advance_dump_shutdown() {
         other => panic!("unexpected status: {other:?}"),
     }
 
-    // One day in hours.
+    // One day in minutes.
     match client
         .call_ok(&Request::AdvanceTick(AdvanceTickParams {
             n: u64::from(TICKS_PER_DAY),
