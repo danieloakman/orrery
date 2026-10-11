@@ -1,5 +1,8 @@
 # Orrery
 
+[![CI](https://github.com/danieloakman/orrery/actions/workflows/ci.yml/badge.svg)](https://github.com/danieloakman/orrery/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Deterministic fantasy **history simulator** in Rust.
 
 Generate a seedable world, tick civilizations for centuries, and export a readable chronicle. A local server owns simulation time; clients advance it with `advance_tick(n)`, the same seam later humans and LLM agents will use to observe and steer.
@@ -9,10 +12,10 @@ Generate a seedable world, tick civilizations for centuries, and export a readab
 ## Quick start
 
 ```bash
-cargo build --workspace
+just build
 
 # Full-tilt run: spawns the server, simulates, dumps artifacts
-cargo run -p orrery -- run --seed 1 --years 100 --out out/seed1
+just run seed=1 years=100 out=out/seed1
 ```
 
 **Outputs** in `--out`:
@@ -24,13 +27,13 @@ cargo run -p orrery -- run --seed 1 --years 100 --out out/seed1
 | `state.json` | Full world snapshot |
 | `manifest.json` | Seed, config, state hash |
 
-Same seed + config + advance sequence ⇒ same hash (`cargo test -p orrery-core`).
+Same seed + config + advance sequence ⇒ same hash (`just test`).
 
 ### Example seeds
 
 ```bash
-cargo run -p orrery -- run --seed 1 --years 200 --out out/seed1
-cargo run -p orrery -- run --seed 42 --years 200 --out out/seed42
+just run seed=1 years=200 out=out/seed1
+just run seed=42 years=200 out=out/seed42
 ```
 
 ### Manual server
@@ -41,6 +44,32 @@ cargo run -p orrery-server -- --socket /tmp/orrery.sock
 cargo run -p orrery -- run --seed 7 --years 50 \
   --socket /tmp/orrery.sock --out out/manual
 ```
+
+## Development
+
+Toolchain is pinned in [`rust-toolchain.toml`](rust-toolchain.toml) (Rust 1.98.1 + rustfmt/clippy/rust-analyzer). That file is the single source of truth for:
+
+- **rustup** / GitHub Actions (`dtolnay/rust-toolchain` reads it)
+- **Nix** (`flake.nix` loads it via [rust-overlay](https://github.com/oxalica/rust-overlay))
+
+```bash
+# Nix + direnv (recommended)
+direnv allow          # or: nix develop
+
+# Without Nix: install rustup, then just
+cargo install just    # if needed
+```
+
+Common tasks:
+
+| Command | What it does |
+|---------|----------------|
+| `just check` | `fmt --check` + `clippy -D warnings` |
+| `just test` | workspace unit + integration tests |
+| `just ci` | `check` then `test` (same as Actions) |
+| `just run` | full-tilt simulation dump |
+
+License: [MIT](LICENSE).
 
 ## How it works
 
