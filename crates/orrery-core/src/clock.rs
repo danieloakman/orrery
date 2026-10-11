@@ -2,11 +2,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::SimConfig;
 
+/// One tick is always one hour. 24 ticks = one day.
+pub const TICKS_PER_DAY: u32 = 24;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Clock {
-    /// Sole advanced counter.
+    /// Sole advanced counter. Unit: hours.
     pub tick: u64,
-    pub ticks_per_day: u32,
     pub days_per_year: u32,
 }
 
@@ -14,7 +16,6 @@ impl Clock {
     pub fn new(cfg: &SimConfig) -> Self {
         Self {
             tick: 0,
-            ticks_per_day: cfg.ticks_per_day.max(1),
             days_per_year: cfg.days_per_year.max(1),
         }
     }
@@ -24,11 +25,12 @@ impl Clock {
     }
 
     pub fn day(&self) -> u64 {
-        self.tick / u64::from(self.ticks_per_day)
+        self.tick / u64::from(TICKS_PER_DAY)
     }
 
+    /// Hour of day, 0..=23.
     pub fn hour(&self) -> u32 {
-        (self.tick % u64::from(self.ticks_per_day)) as u32
+        (self.tick % u64::from(TICKS_PER_DAY)) as u32
     }
 
     pub fn year(&self) -> u64 {
@@ -39,8 +41,12 @@ impl Clock {
         (self.day() % u64::from(self.days_per_year)) as u32
     }
 
+    pub fn ticks_per_year(&self) -> u64 {
+        u64::from(self.days_per_year) * u64::from(TICKS_PER_DAY)
+    }
+
     /// True on the first tick of a new year (after year 0 starts at tick 0).
     pub fn is_year_boundary(&self) -> bool {
-        self.tick > 0 && self.tick % (u64::from(self.days_per_year) * u64::from(self.ticks_per_day)) == 0
+        self.tick > 0 && self.tick % self.ticks_per_year() == 0
     }
 }

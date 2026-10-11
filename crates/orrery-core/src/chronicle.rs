@@ -5,11 +5,10 @@ pub fn render_chronicle_md(world: &World) -> String {
     let mut out = String::new();
     out.push_str("# Orrery Chronicle\n\n");
     out.push_str(&format!(
-        "_seed {} · {}×{} · ticks/day {} · year {}_\n\n",
+        "_seed {} · {}×{} · 1 tick = 1 hour · year {}_\n\n",
         world.config.seed,
         world.config.width,
         world.config.height,
-        world.config.ticks_per_day,
         world.clock.year()
     ));
     for ev in &world.events {

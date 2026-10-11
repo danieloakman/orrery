@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use clap::{Parser, Subcommand};
 use orrery_core::protocol::{AdvanceTickParams, CreateParams, OkBody, Request};
-use orrery_core::{IpcClient, SimConfig};
+use orrery_core::{IpcClient, SimConfig, TICKS_PER_DAY};
 
 #[derive(Parser, Debug)]
 #[command(name = "orrery", about = "Orrery full-tilt simulation runner")]
@@ -26,8 +26,6 @@ struct RunArgs {
     seed: u64,
     #[arg(long, default_value_t = 100)]
     years: u64,
-    #[arg(long, default_value_t = 24)]
-    ticks_per_day: u32,
     #[arg(long, default_value_t = 365)]
     days_per_year: u32,
     #[arg(long, default_value_t = 128)]
@@ -36,7 +34,7 @@ struct RunArgs {
     height: u32,
     #[arg(long, default_value_t = 6)]
     civs: u8,
-    /// Ticks per advance_tick RPC (default: one year)
+    /// Hours (ticks) per advance_tick RPC (default: one year)
     #[arg(long)]
     batch_ticks: Option<u64>,
     /// Connect to an existing server socket. If omitted, spawn orrery-server.
@@ -61,7 +59,6 @@ fn run(args: RunArgs) -> Result<(), Box<dyn std::error::Error>> {
         seed: args.seed,
         width: args.width,
         height: args.height,
-        ticks_per_day: args.ticks_per_day,
         days_per_year: args.days_per_year,
         civ_count: args.civs,
     };
@@ -87,7 +84,10 @@ fn run(args: RunArgs) -> Result<(), Box<dyn std::error::Error>> {
         config: config.clone(),
     }))? {
         OkBody::Created { civs, .. } => {
-            println!("created world seed={} civs={civs}", config.seed);
+            println!(
+                "created world seed={} civs={civs} (1 tick = 1 hour, {} ticks/day)",
+                config.seed, TICKS_PER_DAY
+            );
         }
         other => return Err(format!("unexpected create response: {other:?}").into()),
     }
@@ -105,8 +105,10 @@ fn run(args: RunArgs) -> Result<(), Box<dyn std::error::Error>> {
         match client.call_ok(&Request::AdvanceTick(AdvanceTickParams { n }))? {
             OkBody::AdvanceTick(r) => {
                 println!(
-                    "year {}  tick {}  events+{}{}",
+                    "year {}  day {}  hour {}  tick {}  events+{}{}",
                     r.year,
+                    r.day,
+                    r.tick % u64::from(TICKS_PER_DAY),
                     r.tick,
                     r.events_len,
                     if r.truncated { " (truncated)" } else { "" }
@@ -125,17 +127,21 @@ fn run(args: RunArgs) -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(args.out.join("chronicle.md"), &dump.chronicle_md)?;
     std::fs::write(args.out.join("map.txt"), &dump.map_txt)?;
     std::fs::write(args.out.join("state.json"), &dump.state_json)?;
-    std::fs::write(args.out.join("manifest.json"), serde_json::to_string_pretty(&serde_json::json!({
-        "seed": config.seed,
-        "years": args.years,
-        "ticks_per_day": config.ticks_per_day,
-        "days_per_year": config.days_per_year,
-        "width": config.width,
-        "height": config.height,
-        "civ_count": config.civ_count,
-        "batch_ticks": batch_n,
-        "state_hash": dump.state_hash,
-    }))?)?;
+    std::fs::write(
+        args.out.join("manifest.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "seed": config.seed,
+            "years": args.years,
+            "ticks_per_day": TICKS_PER_DAY,
+            "tick_unit": "hour",
+            "days_per_year": config.days_per_year,
+            "width": config.width,
+            "height": config.height,
+            "civ_count": config.civ_count,
+            "batch_ticks": batch_n,
+            "state_hash": dump.state_hash,
+        }))?,
+    )?;
 
     println!("wrote {} (hash {})", args.out.display(), dump.state_hash);
 
@@ -174,10 +180,8 @@ fn spawn_server(socket: &PathBuf) -> Result<Child, Box<dyn std::error::Error>> {
 fn wait_for_socket(path: &PathBuf, timeout: Duration) -> Result<(), Box<dyn std::error::Error>> {
     let start = std::time::Instant::now();
     while start.elapsed() < timeout {
-        if path.exists() {
-            if IpcClient::connect(path).is_ok() {
-                return Ok(());
-            }
+        if path.exists() && IpcClient::connect(path).is_ok() {
+            return Ok(());
         }
         thread::sleep(Duration::from_millis(50));
     }
