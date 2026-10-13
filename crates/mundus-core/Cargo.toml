@@ -1,21 +1,19 @@
 [package]
-name = "orrery-server"
+name = "mundus-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Local Unix-socket simulation server for Orrery"
+description = "Deterministic fantasy world simulation core for Mundus"
 
 [lints]
 workspace = true
 
-[[bin]]
-name = "orrery-server"
-path = "src/main.rs"
-
 [dependencies]
-orrery-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-clap = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
 thiserror = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }

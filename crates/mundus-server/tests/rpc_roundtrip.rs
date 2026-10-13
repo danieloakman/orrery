@@ -5,8 +5,10 @@ use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use orrery_core::protocol::{AdvanceTickParams, CreateParams, OkBody, Request};
-use orrery_core::{IpcClient, SimConfig, TICKS_PER_DAY};
+use mundus_core::protocol::{
+    AdvanceTickParams, ChronicleParams, CreateParams, GetCivParams, OkBody, Request,
+};
+use mundus_core::{IpcClient, SimConfig, TICKS_PER_DAY};
 
 struct ServerGuard {
     child: Child,
@@ -23,17 +25,17 @@ impl Drop for ServerGuard {
 
 fn spawn_server() -> ServerGuard {
     let socket = std::env::temp_dir().join(format!(
-        "orrery-test-{}-{}.sock",
+        "mundus-test-{}-{}.sock",
         std::process::id(),
         Instant::now().elapsed().as_nanos()
     ));
-    let mut child = Command::new(env!("CARGO_BIN_EXE_orrery-server"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_mundus-server"))
         .arg("--socket")
         .arg(&socket)
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn orrery-server");
+        .expect("spawn mundus-server");
 
     let start = Instant::now();
     while start.elapsed() < Duration::from_secs(10) {
@@ -49,7 +51,7 @@ fn spawn_server() -> ServerGuard {
 }
 
 #[test]
-fn create_advance_dump_shutdown() {
+fn create_observe_advance_dump_shutdown() {
     let server = spawn_server();
     let mut client = IpcClient::connect(&server.socket).expect("connect");
 
@@ -79,10 +81,57 @@ fn create_advance_dump_shutdown() {
             assert_eq!(s.tick, 0);
             assert_eq!(s.day, 0);
             assert_eq!(s.hour, 0);
+            assert_eq!(s.minute, 0);
             assert_eq!(s.year, 0);
+            assert_eq!(s.days_per_year, 365);
             assert_eq!(s.civ_count, 3);
         }
         other => panic!("unexpected status: {other:?}"),
+    }
+
+    let first_name = match client.call_ok(&Request::ListCivs).expect("list_civs") {
+        OkBody::ListCivs(r) => {
+            assert_eq!(r.civs.len(), 3);
+            assert_eq!(r.civs[0].id, 0);
+            r.civs[0].name.clone()
+        }
+        other => panic!("unexpected list_civs: {other:?}"),
+    };
+
+    match client
+        .call_ok(&Request::GetCiv(GetCivParams {
+            query: first_name.clone(),
+        }))
+        .expect("get_civ by name")
+    {
+        OkBody::GetCiv(r) => {
+            assert_eq!(r.civ.id, 0);
+            assert_eq!(r.civ.name, first_name);
+            assert!(!r.civ.settlements.is_empty());
+        }
+        other => panic!("unexpected get_civ: {other:?}"),
+    }
+
+    match client
+        .call_ok(&Request::GetCiv(GetCivParams { query: "0".into() }))
+        .expect("get_civ by id")
+    {
+        OkBody::GetCiv(r) => assert_eq!(r.civ.id, 0),
+        other => panic!("unexpected get_civ id: {other:?}"),
+    }
+
+    match client
+        .call_ok(&Request::Chronicle(ChronicleParams {
+            since_tick: Some(0),
+            limit: Some(10),
+        }))
+        .expect("chronicle")
+    {
+        OkBody::Chronicle(r) => {
+            assert!(!r.events.is_empty());
+            assert!(r.total_matching >= r.events.len());
+        }
+        other => panic!("unexpected chronicle: {other:?}"),
     }
 
     // One day in minutes.
@@ -102,7 +151,7 @@ fn create_advance_dump_shutdown() {
 
     match client.call_ok(&Request::Dump).expect("dump") {
         OkBody::Dump(d) => {
-            assert!(d.chronicle_md.contains("Orrery Chronicle"));
+            assert!(d.chronicle_md.contains("Mundus Chronicle"));
             assert!(!d.map_txt.is_empty());
             assert!(d.state_json.contains("\"tick\""));
             assert_eq!(d.state_hash.len(), 64);

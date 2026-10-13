@@ -3,7 +3,7 @@ use crate::world::World;
 
 pub fn render_chronicle_md(world: &World) -> String {
     let mut out = String::new();
-    out.push_str("# Orrery Chronicle\n\n");
+    out.push_str("# Mundus Chronicle\n\n");
     out.push_str(&format!(
         "_seed {} · {}×{} · 1 tick = 1 minute · year {}_\n\n",
         world.config.seed,

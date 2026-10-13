@@ -5,20 +5,21 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use clap::Parser;
-use orrery_core::protocol::{
-    cap_events, AdvanceTickResult, CreateParams, DumpResult, OkBody, Request, Response,
-    StatusResult,
+use mundus_core::protocol::{
+    cap_events, civ_summary, filter_chronicle, resolve_civ, AdvanceTickResult, ChronicleParams,
+    ChronicleResult, CreateParams, DumpResult, GetCivParams, GetCivResult, ListCivsResult, OkBody,
+    Request, Response, StatusResult, CHRONICLE_DEFAULT_LIMIT,
 };
-use orrery_core::{build_dump, SimConfig, World};
+use mundus_core::{build_dump, SimConfig, World};
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "orrery-server",
-    about = "Orrery simulation server (Unix socket)"
+    name = "mundus-server",
+    about = "Mundus simulation server (Unix socket)"
 )]
 struct Args {
     /// Unix socket path
-    #[arg(long, default_value = "/tmp/orrery.sock")]
+    #[arg(long, default_value = "/tmp/mundus.sock")]
     socket: PathBuf,
 }
 
@@ -31,7 +32,7 @@ struct ServerState {
 fn main() {
     let args = Args::parse();
     if let Err(e) = run(args) {
-        eprintln!("orrery-server error: {e}");
+        eprintln!("mundus-server error: {e}");
         std::process::exit(1);
     }
 }
@@ -44,7 +45,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let listener = UnixListener::bind(&path)?;
     // Accept with timeout so we can notice shutdown without a wake connect.
     listener.set_nonblocking(false)?;
-    println!("orrery-server listening on {}", path.display());
+    println!("mundus-server listening on {}", path.display());
 
     let state = Arc::new(Mutex::new(ServerState {
         world: None,
@@ -72,7 +73,7 @@ fn run(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let _ = std::fs::remove_file(&path);
-    println!("orrery-server shutdown");
+    println!("mundus-server shutdown");
     Ok(())
 }
 
@@ -142,6 +143,18 @@ fn dispatch(state: &Arc<Mutex<ServerState>>, req: Request) -> (Response, bool) {
             Ok(body) => (Response::Ok(body), false),
             Err(e) => (Response::Err { error: e }, false),
         },
+        Request::ListCivs => match list_civs(&guard) {
+            Ok(body) => (Response::Ok(body), false),
+            Err(e) => (Response::Err { error: e }, false),
+        },
+        Request::GetCiv(p) => match get_civ(&guard, p) {
+            Ok(body) => (Response::Ok(body), false),
+            Err(e) => (Response::Err { error: e }, false),
+        },
+        Request::Chronicle(p) => match chronicle(&guard, p) {
+            Ok(body) => (Response::Ok(body), false),
+            Err(e) => (Response::Err { error: e }, false),
+        },
         Request::AdvanceTick(p) => match advance(&mut guard, p.n) {
             Ok(body) => (Response::Ok(body), false),
             Err(e) => (Response::Err { error: e }, false),
@@ -179,9 +192,44 @@ fn status(state: &ServerState) -> Result<OkBody, String> {
         day: w.clock.day(),
         year: w.clock.year(),
         hour: w.clock.hour(),
+        minute: w.clock.minute(),
+        days_per_year: w.config.days_per_year,
         civ_count: w.civs.len(),
         alive_civs: w.alive_civ_count(),
         event_count: w.events.len(),
+    }))
+}
+
+fn list_civs(state: &ServerState) -> Result<OkBody, String> {
+    let w = state.world.as_ref().ok_or("no world; call create first")?;
+    let mut civs: Vec<_> = w.civs.iter().map(civ_summary).collect();
+    civs.sort_by_key(|c| c.id);
+    Ok(OkBody::ListCivs(ListCivsResult {
+        tick: w.clock.tick,
+        civs,
+    }))
+}
+
+fn get_civ(state: &ServerState, params: GetCivParams) -> Result<OkBody, String> {
+    let w = state.world.as_ref().ok_or("no world; call create first")?;
+    let civ = resolve_civ(&w.civs, &params.query)?.clone();
+    Ok(OkBody::GetCiv(GetCivResult {
+        tick: w.clock.tick,
+        civ,
+    }))
+}
+
+fn chronicle(state: &ServerState, params: ChronicleParams) -> Result<OkBody, String> {
+    let w = state.world.as_ref().ok_or("no world; call create first")?;
+    let since_tick = params.since_tick.unwrap_or(0);
+    let limit = params.limit.unwrap_or(CHRONICLE_DEFAULT_LIMIT).max(1);
+    let slice = filter_chronicle(&w.events, since_tick, limit);
+    Ok(OkBody::Chronicle(ChronicleResult {
+        tick: w.clock.tick,
+        since_tick,
+        events: slice.events,
+        total_matching: slice.total_matching,
+        truncated: slice.truncated,
     }))
 }
 

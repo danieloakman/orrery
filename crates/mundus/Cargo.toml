@@ -1,20 +1,20 @@
 [package]
-name = "orrery"
+name = "mundus"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Full-tilt runner client for the Orrery simulation server"
+description = "Mundus simulation client: full-tilt runner and agent CLI"
 
 [lints]
 workspace = true
 
 [[bin]]
-name = "orrery"
+name = "mundus"
 path = "src/main.rs"
 
 [dependencies]
-orrery-core = { workspace = true }
+mundus-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 clap = { workspace = true }

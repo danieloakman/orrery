@@ -1,4 +1,4 @@
-# Orrery developer tasks. Prefer these over ad-hoc cargo flags.
+# Mundus developer tasks. Prefer these over ad-hoc cargo flags.
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 default:
@@ -26,12 +26,12 @@ build-release:
     cargo build --workspace --release
 
 # Start the simulation server only (no auto-advance). Ctrl-C to stop.
-serve socket="/tmp/orrery.sock":
-    cargo run -p orrery-server -- --socket {{socket}}
+serve socket="/tmp/mundus.sock":
+    cargo run -p mundus-server -- --socket {{socket}}
 
 # Full-tilt simulation run (spawns server, advances years, dumps, shuts down).
 run seed="1" years="100" out="out/seed1":
-    cargo run -p orrery -- run --seed {{seed}} --years {{years}} --out {{out}}
+    cargo run -p mundus -- run --seed {{seed}} --years {{years}} --out {{out}}
 
 # Everything CI runs locally.
 ci: check test

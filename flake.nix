@@ -1,5 +1,5 @@
 {
-  description = "Orrery development shell";
+  description = "Mundus development shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -37,7 +37,7 @@
         in
         {
           default = pkgs.mkShell {
-            name = "orrery";
+            name = "mundus";
             packages = [
               rustToolchain
               pkgs.just

@@ -21,8 +21,9 @@ pub use dump::{build_dump, render_map_ascii, state_hash, DumpArtifacts};
 pub use event::{Event, EventKind};
 pub use protocol::cap_events;
 pub use protocol::{
-    AdvanceTickParams, AdvanceTickResult, CreateParams, DumpResult, OkBody, Request, Response,
-    StatusResult, EVENT_CAP,
+    civ_summary, filter_chronicle, resolve_civ, AdvanceTickParams, AdvanceTickResult,
+    ChronicleParams, ChronicleResult, CreateParams, DumpResult, GetCivParams, GetCivResult,
+    ListCivsResult, OkBody, Request, Response, StatusResult, CHRONICLE_DEFAULT_LIMIT, EVENT_CAP,
 };
 pub use world::{Civ, Settlement, SettlementKind, World};
 

@@ -1,15 +1,15 @@
 [workspace]
 resolver = "2"
-members = ["crates/orrery-core", "crates/orrery-server", "crates/orrery"]
+members = ["crates/mundus-core", "crates/mundus-server", "crates/mundus"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/danieloakman/orrery"
+repository = "https://github.com/danieloakman/mundus"
 
 [workspace.dependencies]
-orrery-core = { path = "crates/orrery-core" }
+mundus-core = { path = "crates/mundus-core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rand = "0.8"

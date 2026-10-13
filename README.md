@@ -1,6 +1,6 @@
-# Orrery
+# Mundus
 
-[![CI](https://github.com/danieloakman/orrery/actions/workflows/ci.yml/badge.svg)](https://github.com/danieloakman/orrery/actions/workflows/ci.yml)
+[![CI](https://github.com/danieloakman/mundus/actions/workflows/ci.yml/badge.svg)](https://github.com/danieloakman/mundus/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Deterministic fantasy **history simulator** in Rust.
@@ -39,14 +39,28 @@ just run seed=1 years=200 out=out/seed1
 just run seed=42 years=200 out=out/seed42
 ```
 
-### Attach a client to a running server
+### Agent CLI (observe + advance)
 
 ```bash
-just serve   # terminal 1 — listens on /tmp/orrery.sock
+just serve   # terminal 1 — /tmp/mundus.sock
 
-# terminal 2 — connect instead of spawning a server
-cargo run -p orrery -- run --seed 7 --years 50 \
-  --socket /tmp/orrery.sock --out out/manual
+# terminal 2 — create a world, then observe / step time
+cargo run -p mundus -- create --seed 7 --civs 4
+cargo run -p mundus -- status
+cargo run -p mundus -- civs
+cargo run -p mundus -- civ 0          # or exact name
+cargo run -p mundus -- advance --years 1
+cargo run -p mundus -- chronicle --since 0 --limit 20
+cargo run -p mundus -- --json civs    # machine-readable
+```
+
+Global flags: `-S/--socket` (default `/tmp/mundus.sock`), `--json`.
+
+### Full-tilt against a running server
+
+```bash
+just serve   # terminal 1
+cargo run -p mundus -- -S /tmp/mundus.sock run --seed 7 --years 50 --out out/manual
 ```
 
 ## Development
@@ -79,8 +93,8 @@ License: [MIT](LICENSE).
 ## How it works
 
 ```text
-orrery (runner)  --NDJSON/Unix socket-->  orrery-server  -->  orrery-core
-     create / status / advance_tick(n) / dump / shutdown
+mundus (CLI)  --NDJSON/Unix socket-->  mundus-server  -->  mundus-core
+  create / status / list_civs / get_civ / chronicle / advance_tick / dump / shutdown
 ```
 
 ### Time
@@ -105,6 +119,9 @@ The server never auto-ticks; time stands still until a client advances it. Blind
 |--------|---------|
 | `create` | Seed + config → generate world |
 | `status` | Read-only clock / civ counts |
+| `list_civs` | Summaries of every civilization |
+| `get_civ` | `{ "query": id\|name }` → full civ |
+| `chronicle` | `{ "since_tick"?, "limit"? }` → events |
 | `advance_tick` | `{ "n": u64 }` → step `n` minutes |
 | `dump` | Chronicle, map, state JSON |
 | `shutdown` | Graceful exit |
@@ -113,9 +130,9 @@ The server never auto-ticks; time stands still until a client advances it. Blind
 
 | Crate | Role |
 |-------|------|
-| [`orrery-core`](crates/orrery-core) | Map gen, clock, rules, chronicle, protocol |
-| [`orrery-server`](crates/orrery-server) | Owns one world; Unix socket RPC |
-| [`orrery`](crates/orrery) | Full-tilt runner client |
+| [`mundus-core`](crates/mundus-core) | Map gen, clock, rules, chronicle, protocol |
+| [`mundus-server`](crates/mundus-server) | Owns one world; Unix socket RPC |
+| [`mundus`](crates/mundus) | CLI: full-tilt runner + agent observe/advance |
 
 ## Sample chronicle
 
