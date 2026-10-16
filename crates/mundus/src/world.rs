@@ -38,10 +38,6 @@ pub struct Civ {
     pub settlements: Vec<Settlement>,
 }
 
-fn default_rng() -> ChaCha8Rng {
-    ChaCha8Rng::seed_from_u64(0)
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct World {
     pub config: SimConfig,
@@ -50,8 +46,7 @@ pub struct World {
     pub civs: Vec<Civ>,
     pub events: Vec<Event>,
     pub schedule: SystemSchedule,
-    /// Live RNG; skipped in serde dumps (reseeded to dummy on load).
-    #[serde(skip, default = "default_rng")]
+    /// Live random stream. Included in saves so a restore continues the same history.
     pub rng: ChaCha8Rng,
 }
 

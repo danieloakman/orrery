@@ -1,150 +1,122 @@
-# Mundus
+# sim-rs
 
-[![CI](https://github.com/danieloakman/mundus/actions/workflows/ci.yml/badge.svg)](https://github.com/danieloakman/mundus/actions/workflows/ci.yml)
+[![CI](https://github.com/danieloakman/sim-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/danieloakman/sim-rs/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Deterministic fantasy **history simulator** in Rust.
+A deterministic simulation host. One server process runs one session. The session can be any simulation that implements the `Simulation` trait. This repo ships two: **mundus**, a fantasy civilisation history, and **Game of Life**.
 
-Generate a seedable world, tick civilizations for centuries, and export a readable chronicle. A local server owns simulation time; clients advance it with `advance_tick(n)`, the same seam later humans and LLM agents will use to observe and steer.
+A client starts the server, advances time, and stops it. `sim-ctl` attaches to a running server and sends the other requests. It does not advance time or shut the server down.
 
-> North-star: many agents in one shared world, each locked to a separate civ (or a god role), interacting only through sim rules, not co-op on one fort.
+```text
+client (mundus-client / life-client)
+    spawn, advance, shutdown
+        |
+        v
+sim-server  -- trait -->  mundus | game of life
+        ^
+        |
+sim-ctl: create, actions, call, status, state, restore
+```
 
 ## Quick start
 
 ```bash
 just build
 
-# Server only (clients attach separately)
+# Server only. Clients and sim-ctl attach separately.
 just serve
 
-# Full-tilt run: spawns the server, simulates, dumps artifacts
-just run seed=1 years=100 out=out/seed1
+# Mundus for 100 years
+just run::mundus seed=1 years=100 out=out/seed1
+
+# Game of Life for 50 generations
+just run::life seed=1 ticks=50 out=out/life
 ```
 
-**Outputs** in `--out` (from `just run`):
+`state.json` in `--out` is the save point: the simulation (including its random stream), the journal of edits, any calls still scheduled, a hash, and extras such as the chronicle or the grid.
 
-| File | Contents |
-|------|----------|
-| `chronicle.md` | Dated legends |
-| `map.txt` | ASCII square-grid map |
-| `state.json` | Full world snapshot |
-| `manifest.json` | Seed, config, state hash |
+Same seed, config, and edits produce the same hash.
 
-Same seed + config + advance sequence ⇒ same hash (`just test`).
-
-### Example seeds
+### Watch or edit a running server
 
 ```bash
-just run seed=1 years=200 out=out/seed1
-just run seed=42 years=200 out=out/seed42
+just serve
+
+sim-ctl create --kind game_of_life --config '{"seed":1,"width":16,"height":16,"density":0.3}'
+sim-ctl actions
+sim-ctl call set_cell --params '{"x":1,"y":1,"alive":true}' --at-tick 10
+sim-ctl status
+sim-ctl state
 ```
 
-### Agent CLI (observe + advance)
+`--at-tick` files a mutating call for a later tick. The client that owns the server decides when to advance. Agents can read the world where it stops, and schedule edits for ticks inside the next jump that they will not see happen.
 
-```bash
-just serve   # terminal 1 — /tmp/mundus.sock
+`--max-actions-per-tick` on `sim-server` (default unlimited) caps how many mutating calls one connection may make on a single tick. Reads do not count.
 
-# terminal 2 — create a world, then observe / step time
-cargo run -p mundus -- create --seed 7 --civs 4
-cargo run -p mundus -- status
-cargo run -p mundus -- civs
-cargo run -p mundus -- civ 0          # or exact name
-cargo run -p mundus -- advance --years 1
-cargo run -p mundus -- chronicle --since 0 --limit 20
-cargo run -p mundus -- --json civs    # machine-readable
+## Another simulation
+
+`sim-core` is the trait and the protocol. `sim-server` is the socket host. A different project depends on those two, implements `Simulation`, and passes factories to `serve`:
+
+```rust
+sim_server::serve(
+    sim_server::ServeConfig {
+        socket: "/tmp/sim.sock".into(),
+        max_actions_per_tick: 0,
+    },
+    |kind, config| match kind {
+        "mine" => Ok(Box::new(my_sim::create(config)?)),
+        other => Err(format!("unknown simulation {other}")),
+    },
+    |kind, sim| match kind {
+        "mine" => Ok(Box::new(my_sim::restore(sim)?)),
+        other => Err(format!("unknown simulation {other}")),
+    },
+)?;
 ```
 
-Global flags: `-S/--socket` (default `/tmp/mundus.sock`), `--json`.
-
-### Full-tilt against a running server
-
-```bash
-just serve   # terminal 1
-cargo run -p mundus -- -S /tmp/mundus.sock run --seed 7 --years 50 --out out/manual
-```
-
-## Development
-
-Toolchain is pinned in [`rust-toolchain.toml`](rust-toolchain.toml) (Rust 1.98.1 + rustfmt/clippy/rust-analyzer). That file is the single source of truth for:
-
-- **rustup** / GitHub Actions (`dtolnay/rust-toolchain` reads it)
-- **Nix** (`flake.nix` loads it via [rust-overlay](https://github.com/oxalica/rust-overlay))
-
-```bash
-# Nix + direnv (recommended)
-direnv allow          # or: nix develop
-
-# Without Nix: install rustup, then just
-cargo install just    # if needed
-```
-
-Common tasks:
-
-| Command | What it does |
-|---------|----------------|
-| `just check` | `fmt --check` + `clippy -D warnings` |
-| `just test` | workspace unit + integration tests |
-| `just ci` | `check` then `test` (same as Actions) |
-| `just serve` | start server only (no auto-advance) |
-| `just run` | full-tilt simulation dump |
-
-License: [MIT](LICENSE).
-
-## How it works
-
-```text
-mundus (CLI)  --NDJSON/Unix socket-->  mundus-server  -->  mundus-core
-  create / status / list_civs / get_civ / chronicle / advance_tick / dump / shutdown
-```
-
-### Time
-
-**1 tick = 1 minute, always.** Not configurable. Most systems still run on coarser periods (e.g. yearly) and integrate elapsed time.
-
-| Advance | Sim time |
-|---------|----------|
-| `advance_tick(1)` | 1 minute |
-| `advance_tick(60)` | 1 hour |
-| `advance_tick(1440)` | 1 day |
-| `advance_tick(525600)` | 1 year (365×1440) |
-
-The server never auto-ticks; time stands still until a client advances it. Blind batches are intentional: you pre-commit to a time window before the next observe/intervene chance.
-
-- **Systems:** scheduled (e.g. yearly civ growth/war), integrating elapsed time. Queries never mutate state.
-- **Stop policy:** the server never decides to end (civs dying is just state). The client chooses when to dump or shut down.
-
-### RPC (newline-delimited JSON)
-
-| Method | Purpose |
-|--------|---------|
-| `create` | Seed + config → generate world |
-| `status` | Read-only clock / civ counts |
-| `list_civs` | Summaries of every civilization |
-| `get_civ` | `{ "query": id\|name }` → full civ |
-| `chronicle` | `{ "since_tick"?, "limit"? }` → events |
-| `advance_tick` | `{ "n": u64 }` → step `n` minutes |
-| `dump` | Chronicle, map, state JSON |
-| `shutdown` | Graceful exit |
+`mundus` and `life` are not part of that library. They are plug-ins wired by the `sim-rs` binary in this repo.
 
 ## Workspace
 
 | Crate | Role |
-|-------|------|
-| [`mundus-core`](crates/mundus-core) | Map gen, clock, rules, chronicle, protocol |
-| [`mundus-server`](crates/mundus-server) | Owns one world; Unix socket RPC |
-| [`mundus`](crates/mundus) | CLI: full-tilt runner + agent observe/advance |
+| --- | --- |
+| `sim-core` | Trait, protocol, IPC client |
+| `sim-server` | Socket host library |
+| `sim-ctl` | Attach-only request CLI |
+| `sim-rs` | `sim-server` binary; registers mundus and Game of Life |
+| `mundus` | Fantasy civilisation simulation |
+| `life` | Conway's Game of Life |
+| `mundus-client` | Run mundus and write a save point |
+| `life-client` | Run Game of Life and write a save point |
 
-## Sample chronicle
+## Time
 
-```markdown
-**Year 0** (day 0): The age began with 6 peoples.
-**Year 0** (day 0): The Corfolk founded a settlement at (91,58).
-**Year 6** (day 2190): Among the Dunhold: a twin moon rose and the rivers ran silver for a night
-**Year 10** (day 3650): The Belormoor expanded to (42,34).
+The host does not define what a tick means. Mundus uses 1 tick = 1 minute. Game of Life uses 1 tick = 1 generation.
+
+The server does not advance on its own. A client calls `advance`. Scheduled calls run when the world reaches their tick, in the order they were accepted. Ticks that an `advance` jumps over are not shown.
+
+A stopped simulation accepts reads and `state`. It rejects `advance` and mutating calls. Game of Life stops at `max_ticks`. Mundus does not stop itself.
+
+## Development
+
+Toolchain is pinned in [`rust-toolchain.toml`](rust-toolchain.toml).
+
+```bash
+direnv allow          # or: nix develop
+just ci
 ```
 
-## Status / non-goals
+| Command | What it does |
+| --- | --- |
+| `just check` | `fmt --check` + `clippy -D warnings` |
+| `just test` | workspace tests |
+| `just ci` | `check` then `test` |
+| `just serve` | server only |
+| `just run::mundus` | mundus save point |
+| `just run::life` | Game of Life save point |
 
-POC: headless fantasy world, server + runner, deterministic dumps.
+## Not built
 
-Not yet: `simctl` god/civ interventions, agent skills, map UI, hex grids, networked multiplayer.
+A client that lets a person play, and a client that runs several agents fairly, are the same kind of program as `mundus-client`: they start the server, advance it, and stop it. Agents would use `sim-ctl` to read and to schedule calls. Those clients are not in this repo yet.
+
+License: [MIT](LICENSE).

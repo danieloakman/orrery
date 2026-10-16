@@ -1,0 +1,19 @@
+[package]
+name = "sim-ctl"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Attach to a simulation server and send protocol requests"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "sim-ctl"
+path = "src/main.rs"
+
+[dependencies]
+sim-core = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }

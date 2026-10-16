@@ -1,5 +1,7 @@
-# Mundus developer tasks. Prefer these over ad-hoc cargo flags.
+# sim-rs developer tasks. Prefer these over ad-hoc cargo flags.
 set shell := ["bash", "-euo", "pipefail", "-c"]
+
+mod run
 
 default:
     @just --list
@@ -26,12 +28,8 @@ build-release:
     cargo build --workspace --release
 
 # Start the simulation server only (no auto-advance). Ctrl-C to stop.
-serve socket="/tmp/mundus.sock":
-    cargo run -p mundus-server -- --socket {{socket}}
-
-# Full-tilt simulation run (spawns server, advances years, dumps, shuts down).
-run seed="1" years="100" out="out/seed1":
-    cargo run -p mundus -- run --seed {{seed}} --years {{years}} --out {{out}}
+serve socket="/tmp/sim.sock":
+    cargo run -p sim-rs -- --socket {{socket}}
 
 # Everything CI runs locally.
 ci: check test

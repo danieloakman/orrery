@@ -49,8 +49,7 @@ impl Client {
         if n == 0 {
             return Err(IpcError::Empty);
         }
-        let resp: Response = serde_json::from_str(resp_line.trim_end())?;
-        Ok(resp)
+        Ok(serde_json::from_str(resp_line.trim_end())?)
     }
 
     pub fn call_ok(&mut self, req: &Request) -> Result<crate::protocol::OkBody, IpcError> {

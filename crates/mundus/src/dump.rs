@@ -1,30 +1,8 @@
 use sha2::{Digest, Sha256};
 
-use crate::chronicle::render_chronicle_md;
 use crate::world::{SettlementKind, World};
 
-pub struct DumpArtifacts {
-    pub chronicle_md: String,
-    pub map_txt: String,
-    pub state_json: String,
-    pub state_hash: String,
-}
-
-pub fn build_dump(world: &World) -> Result<DumpArtifacts, serde_json::Error> {
-    let chronicle_md = render_chronicle_md(world);
-    let map_txt = render_map_ascii(world);
-    let state_json = serde_json::to_string_pretty(world)?;
-    let state_hash = state_hash(world);
-    Ok(DumpArtifacts {
-        chronicle_md,
-        map_txt,
-        state_json,
-        state_hash,
-    })
-}
-
 pub fn state_hash(world: &World) -> String {
-    // Hash canonical JSON of world (rng is skipped in serde).
     let bytes = serde_json::to_vec(world).expect("serialize world");
     let digest = Sha256::digest(&bytes);
     hex::encode(digest)

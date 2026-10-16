@@ -194,6 +194,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
 
 [[package]]
+name = "life"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "rand",
+ "rand_chacha",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sim-core",
+]
+
+[[package]]
+name = "life-client"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "serde_json",
+ "sim-core",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -203,35 +225,23 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 name = "mundus"
 version = "0.1.0"
 dependencies = [
- "clap",
- "mundus-core",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "mundus-core"
-version = "0.1.0"
-dependencies = [
  "hex",
  "rand",
  "rand_chacha",
  "serde",
  "serde_json",
  "sha2",
+ "sim-core",
  "thiserror",
 ]
 
 [[package]]
-name = "mundus-server"
+name = "mundus-client"
 version = "0.1.0"
 dependencies = [
  "clap",
- "mundus-core",
- "serde",
  "serde_json",
- "thiserror",
+ "sim-core",
 ]
 
 [[package]]
@@ -286,6 +296,7 @@ checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
 dependencies = [
  "ppv-lite86",
  "rand_core",
+ "serde",
 ]
 
 [[package]]
@@ -349,6 +360,47 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
+]
+
+[[package]]
+name = "sim-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "sim-ctl"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "serde_json",
+ "sim-core",
+]
+
+[[package]]
+name = "sim-rs"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "life",
+ "mundus",
+ "serde_json",
+ "sim-core",
+ "sim-server",
+]
+
+[[package]]
+name = "sim-server"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde_json",
+ "sha2",
+ "sim-core",
+ "thiserror",
 ]
 
 [[package]]

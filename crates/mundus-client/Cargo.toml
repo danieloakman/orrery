@@ -1,0 +1,20 @@
+[package]
+name = "mundus-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Start a server, run the mundus simulation, and save its state"
+publish = false
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "mundus-client"
+path = "src/main.rs"
+
+[dependencies]
+sim-core = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }

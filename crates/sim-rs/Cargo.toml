@@ -1,0 +1,23 @@
+[package]
+name = "sim-rs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "sim-server binary with the mundus and game of life plug-ins"
+publish = false
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "sim-server"
+path = "src/main.rs"
+
+[dependencies]
+sim-core = { workspace = true }
+sim-server = { workspace = true }
+mundus = { workspace = true }
+life = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }

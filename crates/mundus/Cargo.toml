@@ -4,18 +4,18 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Mundus simulation client: full-tilt runner and agent CLI"
+description = "Deterministic fantasy civilisation simulation"
+publish = false
 
 [lints]
 workspace = true
 
-[[bin]]
-name = "mundus"
-path = "src/main.rs"
-
 [dependencies]
-mundus-core = { workspace = true }
+sim-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-clap = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
 thiserror = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }

@@ -1,19 +1,20 @@
 [package]
-name = "mundus-core"
+name = "life"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Deterministic fantasy world simulation core for Mundus"
+description = "Conway's Game of Life as a simulation plug-in"
+publish = false
 
 [lints]
 workspace = true
 
 [dependencies]
+sim-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
-thiserror = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }

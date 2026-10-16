@@ -1,19 +1,31 @@
 [workspace]
 resolver = "2"
-members = ["crates/mundus-core", "crates/mundus-server", "crates/mundus"]
+members = [
+    "crates/sim-core",
+    "crates/sim-server",
+    "crates/sim-rs",
+    "crates/sim-ctl",
+    "crates/mundus",
+    "crates/life",
+    "crates/mundus-client",
+    "crates/life-client",
+]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/danieloakman/mundus"
+repository = "https://github.com/danieloakman/sim-rs"
 
 [workspace.dependencies]
-mundus-core = { path = "crates/mundus-core" }
+sim-core = { path = "crates/sim-core" }
+sim-server = { path = "crates/sim-server" }
+mundus = { path = "crates/mundus" }
+life = { path = "crates/life" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rand = "0.8"
-rand_chacha = "0.3"
+rand_chacha = { version = "0.3", features = ["serde1"] }
 clap = { version = "4", features = ["derive"] }
 thiserror = "2"
 sha2 = "0.10"

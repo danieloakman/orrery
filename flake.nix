@@ -1,5 +1,5 @@
 {
-  description = "Mundus development shell";
+  description = "sim-rs development shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -37,7 +37,7 @@
         in
         {
           default = pkgs.mkShell {
-            name = "mundus";
+            name = "sim-rs";
             packages = [
               rustToolchain
               pkgs.just
