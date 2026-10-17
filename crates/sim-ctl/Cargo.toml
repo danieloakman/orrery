@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Attach to a simulation server and send protocol requests"
+description = "Connect to a simulation server as a player"
 
 [lints]
 workspace = true

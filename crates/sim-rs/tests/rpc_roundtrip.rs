@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::thread;
@@ -5,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::json;
 use sim_core::IpcClient;
-use sim_core::{AdvanceParams, CallParams, CreateParams, OkBody, Request, RestoreParams};
+use sim_core::{AdvanceParams, CallParams, OkBody, Request, StateBody};
 
 struct ServerGuard {
     child: Child,
@@ -20,7 +21,15 @@ impl Drop for ServerGuard {
     }
 }
 
-fn spawn_server() -> ServerGuard {
+struct DirGuard(PathBuf);
+
+impl Drop for DirGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+fn spawn_server(extra: &[impl AsRef<OsStr>]) -> ServerGuard {
     let socket = std::env::temp_dir().join(format!(
         "sim-test-{}-{}.sock",
         std::process::id(),
@@ -29,8 +38,7 @@ fn spawn_server() -> ServerGuard {
     let mut child = Command::new(env!("CARGO_BIN_EXE_sim-server"))
         .arg("--socket")
         .arg(&socket)
-        .arg("--max-actions-per-tick")
-        .arg("2")
+        .args(extra)
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
@@ -57,23 +65,34 @@ fn spawn_server() -> ServerGuard {
 
 #[test]
 fn life_schedule_advance_state_restore() {
-    let server = spawn_server();
+    let dir = DirGuard(std::env::temp_dir().join(format!(
+        "sim-test-dir-{}-{}",
+        std::process::id(),
+        Instant::now().elapsed().as_nanos()
+    )));
+    std::fs::create_dir_all(&dir.0).unwrap();
+    let state_path = dir.0.join("state.json");
+    let restored_path = dir.0.join("restored.json");
+
+    let server = spawn_server(&[
+        "--max-actions-per-tick",
+        "2",
+        "--state-out",
+        state_path.to_str().unwrap(),
+        "create",
+        "--kind",
+        "game_of_life",
+        "--config",
+        r#"{"seed":4,"width":8,"height":8,"density":0.2}"#,
+    ]);
     let mut client = IpcClient::connect(&server.socket).unwrap();
 
-    match client
-        .call_ok(&Request::Create(CreateParams {
-            kind: "game_of_life".into(),
-            config: json!({
-                "seed": 4,
-                "width": 8,
-                "height": 8,
-                "density": 0.2
-            }),
-        }))
-        .unwrap()
-    {
-        OkBody::Created { tick } => assert_eq!(tick, 0),
-        other => panic!("unexpected create: {other:?}"),
+    match client.call_ok(&Request::Status).unwrap() {
+        OkBody::Status(status) => {
+            assert_eq!(status.kind, "game_of_life");
+            assert_eq!(status.tick, 0);
+        }
+        other => panic!("unexpected status: {other:?}"),
     }
 
     let actions = match client.call_ok(&Request::Actions).unwrap() {
@@ -114,35 +133,35 @@ fn life_schedule_advance_state_restore() {
         other => panic!("unexpected advance: {other:?}"),
     }
 
-    let state = match client.call_ok(&Request::State).unwrap() {
-        OkBody::State(state) => state,
-        other => panic!("unexpected state: {other:?}"),
-    };
-    assert_eq!(state.journal.len(), 2);
-    assert!(state.scheduled.is_empty());
-    assert!(state.extras.get("grid_txt").is_some());
-
     client.call_ok(&Request::Shutdown).unwrap();
     drop(client);
     drop(server);
 
-    let server = spawn_server();
+    let state: StateBody =
+        serde_json::from_str(&std::fs::read_to_string(&state_path).unwrap()).unwrap();
+    assert_eq!(state.journal.len(), 2);
+    assert!(state.scheduled.is_empty());
+    assert!(state.extras.get("grid_txt").is_some());
+
+    let server = spawn_server(&[
+        "--max-actions-per-tick",
+        "2",
+        "--state-out",
+        restored_path.to_str().unwrap(),
+        "restore",
+        "--file",
+        state_path.to_str().unwrap(),
+    ]);
     let mut client = IpcClient::connect(&server.socket).unwrap();
-    match client
-        .call_ok(&Request::Restore(RestoreParams {
-            kind: state.kind,
-            sim: state.sim,
-            journal: state.journal,
-            scheduled: state.scheduled,
-        }))
-        .unwrap()
-    {
-        OkBody::Restored { tick } => assert_eq!(tick, 5),
-        other => panic!("unexpected restore: {other:?}"),
+    match client.call_ok(&Request::Status).unwrap() {
+        OkBody::Status(status) => assert_eq!(status.tick, 5),
+        other => panic!("unexpected status: {other:?}"),
     }
-    let again = match client.call_ok(&Request::State).unwrap() {
-        OkBody::State(state) => state,
-        other => panic!("unexpected state: {other:?}"),
-    };
+    client.call_ok(&Request::Shutdown).unwrap();
+    drop(client);
+    drop(server);
+
+    let again: StateBody =
+        serde_json::from_str(&std::fs::read_to_string(&restored_path).unwrap()).unwrap();
     assert_eq!(again.state_hash, state.state_hash);
 }

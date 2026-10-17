@@ -1,17 +1,17 @@
 //! Socket host. One process, one session, many connections.
+//!
+//! The process owns the simulation. Callers build a [`Session`] (create or
+//! restore) and pass it in. Players send `status`, `actions`, and `call`.
 
 mod session;
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::thread;
 
-use serde_json::Value;
-use sim_core::{
-    AdvanceParams, CallParams, CreateParams, OkBody, Request, Response, RestoreParams, Simulation,
-};
+use sim_core::{AdvanceParams, CallParams, OkBody, Request, Response, StateBody};
 
 pub use session::{hash_sim, Session};
 
@@ -19,25 +19,20 @@ pub struct ServeConfig {
     pub socket: PathBuf,
     /// `0` means a connection may make any number of mutating calls on a tick.
     pub max_actions_per_tick: u32,
+    /// Save point written on `shutdown`.
+    pub state_out: Option<PathBuf>,
 }
-
-type Factory = Arc<dyn Fn(&str, Value) -> Result<Box<dyn Simulation>, String> + Send + Sync>;
 
 struct ServerInner {
-    session: Option<Session>,
+    session: Session,
     shutdown: bool,
     socket: PathBuf,
+    state_out: Option<PathBuf>,
     max_actions_per_tick: u32,
-    create: Factory,
-    restore: Factory,
 }
 
-/// Listen until a client sends `shutdown`.
-pub fn serve(
-    config: ServeConfig,
-    create: impl Fn(&str, Value) -> Result<Box<dyn Simulation>, String> + Send + Sync + 'static,
-    restore: impl Fn(&str, Value) -> Result<Box<dyn Simulation>, String> + Send + Sync + 'static,
-) -> Result<(), Box<dyn std::error::Error>> {
+/// Listen until a client sends `shutdown`. The session already exists.
+pub fn serve(config: ServeConfig, session: Session) -> Result<(), Box<dyn std::error::Error>> {
     let path = config.socket;
     if path.exists() {
         std::fs::remove_file(&path)?;
@@ -46,12 +41,11 @@ pub fn serve(
     println!("sim-server listening on {}", path.display());
 
     let state = Arc::new(RwLock::new(ServerInner {
-        session: None,
+        session,
         shutdown: false,
         socket: path.clone(),
+        state_out: config.state_out,
         max_actions_per_tick: config.max_actions_per_tick,
-        create: Arc::new(create),
-        restore: Arc::new(restore),
     }));
 
     for conn in listener.incoming() {
@@ -125,10 +119,7 @@ fn dispatch(
     budget: &mut session::Budget,
     req: Request,
 ) -> (Response, bool) {
-    let readonly = matches!(
-        req,
-        Request::Status | Request::Actions | Request::State | Request::Call(_)
-    );
+    let readonly = matches!(req, Request::Status | Request::Actions | Request::Call(_));
     if readonly {
         if let Request::Call(ref params) = req {
             if let Some(resp) = call_readonly(state, params) {
@@ -146,7 +137,7 @@ fn call_readonly(state: &Arc<RwLock<ServerInner>>, params: &CallParams) -> Optio
         Ok(guard) => guard,
         Err(_) => return Some(err("lock poisoned")),
     };
-    let session = guard.session.as_ref()?;
+    let session = &guard.session;
     let spec = session
         .actions()
         .into_iter()
@@ -166,15 +157,12 @@ fn read_dispatch(state: &Arc<RwLock<ServerInner>>, req: &Request) -> Response {
         Ok(guard) => guard,
         Err(_) => return err("lock poisoned"),
     };
-    let Some(session) = guard.session.as_ref() else {
-        return err("no session; call create or restore first");
-    };
+    let session = &guard.session;
     match req {
         Request::Status => Response::Ok(OkBody::Status(session.status())),
         Request::Actions => Response::Ok(OkBody::Actions {
             actions: session.actions(),
         }),
-        Request::State => Response::Ok(OkBody::State(session.state())),
         _ => err("internal: not a read"),
     }
 }
@@ -189,26 +177,9 @@ fn write_dispatch(
         Err(_) => return (err("lock poisoned"), false),
     };
     match req {
-        Request::Create(CreateParams { kind, config }) => {
-            if guard.session.is_some() {
-                return (err("session already created"), false);
-            }
-            match (guard.create)(&kind, config) {
-                Ok(sim) => {
-                    let tick = sim.tick();
-                    guard.session = Some(Session::new(sim));
-                    (Response::Ok(OkBody::Created { tick }), false)
-                }
-                Err(error) => (err(error), false),
-            }
-        }
-        Request::Restore(params) => (restore(&mut guard, params), false),
         Request::Call(params) => {
             let limit = guard.max_actions_per_tick;
-            let Some(session) = guard.session.as_mut() else {
-                return (err("no session; call create or restore first"), false);
-            };
-            match session.call(
+            match guard.session.call(
                 &params.name,
                 params.params_or_empty(),
                 params.at_tick,
@@ -219,43 +190,37 @@ fn write_dispatch(
                 Err(error) => (err(error), false),
             }
         }
-        Request::Advance(AdvanceParams { n }) => {
-            let Some(session) = guard.session.as_mut() else {
-                return (err("no session; call create or restore first"), false);
-            };
-            match session.advance(n) {
-                Ok(body) => (Response::Ok(OkBody::Advance(body)), false),
-                Err(error) => (err(error), false),
-            }
-        }
+        Request::Advance(AdvanceParams { n }) => match guard.session.advance(n) {
+            Ok(body) => (Response::Ok(OkBody::Advance(body)), false),
+            Err(error) => (err(error), false),
+        },
         Request::Shutdown => {
             let socket = guard.socket.clone();
+            let write_error = match guard.state_out.as_ref() {
+                Some(path) => write_state(path, &guard.session.state()).err(),
+                None => None,
+            };
             guard.shutdown = true;
             drop(guard);
             let _ = UnixStream::connect(socket);
-            (Response::Ok(OkBody::Shutdown), true)
+            match write_error {
+                Some(error) => (err(error), true),
+                None => (Response::Ok(OkBody::Shutdown), true),
+            }
         }
-        Request::Status | Request::Actions | Request::State => {
-            (err("internal: read on write path"), false)
-        }
+        Request::Status | Request::Actions => (err("internal: read on write path"), false),
     }
 }
 
-fn restore(guard: &mut ServerInner, params: RestoreParams) -> Response {
-    if guard.session.is_some() {
-        return err("session already created");
-    }
-    // The journal is kept as the history of edits. It is not replayed to prove it matches `sim`.
-    match (guard.restore)(&params.kind, params.sim) {
-        Ok(sim) => {
-            let tick = sim.tick();
-            let mut session = Session::new(sim);
-            session.install_history(params.journal, params.scheduled);
-            guard.session = Some(session);
-            Response::Ok(OkBody::Restored { tick })
+fn write_state(path: &Path, state: &StateBody) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        Err(error) => err(error),
     }
+    let mut json = serde_json::to_string_pretty(state).map_err(|e| e.to_string())?;
+    json.push('\n');
+    std::fs::write(path, json).map_err(|e| e.to_string())
 }
 
 fn err(error: impl Into<String>) -> Response {

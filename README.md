@@ -5,7 +5,7 @@
 
 A deterministic simulation host. One server process runs one session. The session can be any simulation that implements the `Simulation` trait. This repo ships two: **mundus**, a fantasy civilisation history, and **Game of Life**.
 
-A client starts the server, advances time, and stops it. `sim-ctl` attaches to a running server and sends the other requests. It does not advance time or shut the server down.
+The server owns the simulation. It creates or restores the session when it starts, and writes the save point on shutdown. A client starts that server, advances time, and stops it. `sim-ctl` connects as a player: `actions`, `call`, and `status`. It does not create a session, restore one, dump state, advance time, or shut the server down.
 
 ```text
 client (mundus-client / life-client)
@@ -13,9 +13,10 @@ client (mundus-client / life-client)
         |
         v
 sim-server  -- trait -->  mundus | game of life
+    create | restore at start, state on shutdown
         ^
         |
-sim-ctl: create, actions, call, status, state, restore
+sim-ctl: actions, call, status
 ```
 
 ## Quick start
@@ -23,7 +24,7 @@ sim-ctl: create, actions, call, status, state, restore
 ```bash
 just build
 
-# Server only. Clients and sim-ctl attach separately.
+# Server owns the session. Players attach with sim-ctl.
 just serve
 
 # Mundus for 100 years
@@ -42,11 +43,21 @@ Same seed, config, and edits produce the same hash.
 ```bash
 just serve
 
-sim-ctl create --kind game_of_life --config '{"seed":1,"width":16,"height":16,"density":0.3}'
 sim-ctl actions
 sim-ctl call set_cell --params '{"x":1,"y":1,"alive":true}' --at-tick 10
 sim-ctl status
-sim-ctl state
+```
+
+`just serve` creates Game of Life. Pass `kind` and `config` for another simulation. `state_out` is the save point written on shutdown:
+
+```bash
+just serve kind=mundus config='{"seed":1,"width":32,"height":32,"civ_count":4}' state_out=out/state.json
+```
+
+Load a save point with the server, not with `sim-ctl`:
+
+```bash
+cargo run -p sim-rs -- --state-out out/next.json restore --file out/state.json
 ```
 
 `--at-tick` files a mutating call for a later tick. The client that owns the server decides when to advance. Agents can read the world where it stops, and schedule edits for ticks inside the next jump that they will not see happen.
@@ -55,24 +66,21 @@ sim-ctl state
 
 ## Another simulation
 
-`sim-core` is the trait and the protocol. `sim-server` is the socket host. A different project depends on those two, implements `Simulation`, and passes factories to `serve`:
+`sim-core` is the trait and the protocol. `sim-server` is the socket host. A different project depends on those two, implements `Simulation`, builds the session, and passes it to `serve`:
 
 ```rust
+let sim = my_sim::create(config)?;
 sim_server::serve(
     sim_server::ServeConfig {
         socket: "/tmp/sim.sock".into(),
         max_actions_per_tick: 0,
+        state_out: Some("state.json".into()),
     },
-    |kind, config| match kind {
-        "mine" => Ok(Box::new(my_sim::create(config)?)),
-        other => Err(format!("unknown simulation {other}")),
-    },
-    |kind, sim| match kind {
-        "mine" => Ok(Box::new(my_sim::restore(sim)?)),
-        other => Err(format!("unknown simulation {other}")),
-    },
+    sim_server::Session::new(Box::new(sim)),
 )?;
 ```
+
+Restoring is the same shape: build the simulation from the save document, then `session.install_history(journal, scheduled)` before `serve`. The server writes that save point to `state_out` when a client sends `shutdown`.
 
 `mundus` and `life` are not part of that library. They are plug-ins wired by the `sim-rs` binary in this repo.
 
@@ -82,7 +90,7 @@ sim_server::serve(
 | --- | --- |
 | `sim-core` | Trait, protocol, IPC client |
 | `sim-server` | Socket host library |
-| `sim-ctl` | Attach-only request CLI |
+| `sim-ctl` | Player CLI: `actions`, `call`, `status` |
 | `sim-rs` | `sim-server` binary; registers mundus and Game of Life |
 | `mundus` | Fantasy civilisation simulation |
 | `life` | Conway's Game of Life |
@@ -95,7 +103,7 @@ The host does not define what a tick means. Mundus uses 1 tick = 1 minute. Game 
 
 The server does not advance on its own. A client calls `advance`. Scheduled calls run when the world reaches their tick, in the order they were accepted. Ticks that an `advance` jumps over are not shown.
 
-A stopped simulation accepts reads and `state`. It rejects `advance` and mutating calls. Game of Life stops at `max_ticks`. Mundus does not stop itself.
+A stopped simulation accepts reads (`status`, `actions`, and read-only calls). It rejects `advance` and mutating calls. The server writes the save point on shutdown. Game of Life stops at `max_ticks`. Mundus does not stop itself.
 
 ## Development
 
@@ -117,6 +125,6 @@ just ci
 
 ## Not built
 
-A client that lets a person play, and a client that runs several agents fairly, are the same kind of program as `mundus-client`: they start the server, advance it, and stop it. Agents would use `sim-ctl` to read and to schedule calls. Those clients are not in this repo yet.
+A client that lets a person play, and a client that runs several agents fairly, are the same kind of program as `mundus-client`: they start the server, advance it, and stop it. Agents would use `sim-ctl` to read status, list actions, and schedule calls. Those clients are not in this repo yet.
 
 License: [MIT](LICENSE).

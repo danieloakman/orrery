@@ -3,15 +3,12 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use serde_json::Value;
 use sim_core::IpcClient;
-use sim_core::{CallParams, CreateParams, OkBody, Request, RestoreParams, StateBody};
+use sim_core::{CallParams, OkBody, Request};
 
 const DEFAULT_SOCKET: &str = "/tmp/sim.sock";
 
 #[derive(Parser, Debug)]
-#[command(
-    name = "sim-ctl",
-    about = "Send requests to a running simulation server"
-)]
+#[command(name = "sim-ctl", about = "Connect to a simulation server as a player")]
 struct Cli {
     /// Unix socket of a running sim-server.
     #[arg(short = 'S', long, global = true, default_value = DEFAULT_SOCKET)]
@@ -25,14 +22,6 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Cmd {
-    /// Create a session. The server must not already have one.
-    Create {
-        #[arg(long)]
-        kind: String,
-        /// JSON object passed to the simulation.
-        #[arg(long)]
-        config: String,
-    },
     /// List calls the current session supports.
     Actions,
     /// Run or schedule a call advertised by `actions`.
@@ -47,13 +36,6 @@ enum Cmd {
     },
     /// Clock and simulation summary.
     Status,
-    /// Write the save point to stdout.
-    State,
-    /// Load a save point. The server must not already have a session.
-    Restore {
-        #[arg(long)]
-        file: PathBuf,
-    },
 }
 
 fn main() {
@@ -67,10 +49,6 @@ fn main() {
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let mut client = IpcClient::connect(&cli.socket)?;
     let body = match cli.cmd {
-        Cmd::Create { kind, config } => {
-            let config: Value = serde_json::from_str(&config)?;
-            client.call_ok(&Request::Create(CreateParams { kind, config }))?
-        }
         Cmd::Actions => client.call_ok(&Request::Actions)?,
         Cmd::Call {
             name,
@@ -85,24 +63,12 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }))?
         }
         Cmd::Status => client.call_ok(&Request::Status)?,
-        Cmd::State => client.call_ok(&Request::State)?,
-        Cmd::Restore { file } => {
-            let text = std::fs::read_to_string(&file)?;
-            let state: StateBody = serde_json::from_str(&text)?;
-            client.call_ok(&Request::Restore(RestoreParams {
-                kind: state.kind,
-                sim: state.sim,
-                journal: state.journal,
-                scheduled: state.scheduled,
-            }))?
-        }
     };
     if cli.json {
         println!("{}", serde_json::to_string_pretty(&body)?);
         return Ok(());
     }
     match body {
-        OkBody::Created { tick } => println!("created at tick {tick}"),
         OkBody::Status(status) => {
             println!(
                 "{} tick {} stopped {}",
@@ -130,9 +96,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 println!("ok");
             }
         }
-        OkBody::State(state) => println!("{}", serde_json::to_string_pretty(&state)?),
-        OkBody::Restored { tick } => println!("restored at tick {tick}"),
-        OkBody::Advance(_) | OkBody::Shutdown => {}
+        OkBody::Advance(_) | OkBody::Shutdown => {
+            return Err("unexpected server response".into());
+        }
     }
     Ok(())
 }

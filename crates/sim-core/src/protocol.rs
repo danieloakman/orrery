@@ -18,23 +18,16 @@ pub struct FailedCall {
     pub error: String,
 }
 
+/// Player and driver requests. Creating, restoring, and saving a session are
+/// not requests: the server process owns the simulation it runs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method", content = "params", rename_all = "snake_case")]
 pub enum Request {
-    Create(CreateParams),
     Status,
     Actions,
     Call(CallParams),
     Advance(AdvanceParams),
-    State,
-    Restore(RestoreParams),
     Shutdown,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateParams {
-    pub kind: String,
-    pub config: Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,16 +45,6 @@ pub struct AdvanceParams {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RestoreParams {
-    pub kind: String,
-    pub sim: Value,
-    #[serde(default)]
-    pub journal: Vec<ActionRecord>,
-    #[serde(default)]
-    pub scheduled: Vec<ActionRecord>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Response {
     Ok(OkBody),
@@ -71,13 +54,10 @@ pub enum Response {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum OkBody {
-    Created { tick: u64 },
     Status(StatusBody),
     Actions { actions: Vec<ActionSpec> },
     Call(CallBody),
     Advance(AdvanceBody),
-    State(StateBody),
-    Restored { tick: u64 },
     Shutdown,
 }
 
@@ -104,7 +84,7 @@ pub struct AdvanceBody {
     pub failed: Vec<FailedCall>,
 }
 
-/// Save point. `sim` is the full simulation document, including its random stream.
+/// Save point written by the server. `sim` is the full simulation document, including its random stream.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateBody {
     pub kind: String,
